@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard | Capture the Moment</title>
+    <style>
+      :root { font-family: Segoe UI, system-ui, sans-serif; color: #172033; }
+      body { margin: 0; background: #f4f6f8; }
+      header { display: flex; justify-content: space-between; align-items: center; padding: 20px 8%; background: #172033; color: white; }
+      main { width: min(720px, calc(100% - 32px)); margin: 40px auto; }
+      section { padding: 28px; margin-top: 24px; background: white; border-radius: 14px; box-shadow: 0 8px 24px #17203312; }
+      form { display: grid; gap: 12px; } label { font-weight: 600; }
+      input, textarea { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #c9ced8; border-radius: 8px; font: inherit; }
+      textarea { min-height: 110px; resize: vertical; }
+      button { padding: 11px 16px; border: 0; border-radius: 8px; background: #3155d9; color: white; font-weight: 700; cursor: pointer; }
+      .muted { color: #5b6475; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Capture the Moment</strong>
+      <span>Dashboard</span>
+    </header>
+    <main>
+      <h1>Your dashboard</h1>
+      <p class="muted">You are authenticated. Create a project request below.</p>
+      <section>
+        <h2>New project</h2>
+        <form action="/projects" method="post">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+          <label for="name">Project name</label>
+          <input id="name" name="name" required maxlength="100" />
+          <label for="description">Description</label>
+          <textarea id="description" name="description" maxlength="1000"></textarea>
+          <button type="submit">Create project</button>
+        </form>
+        <p class="muted">Project creation is not available yet.</p>
+      </section>
+    </main>
+  </body>
+</html>
