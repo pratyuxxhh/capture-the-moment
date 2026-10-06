@@ -39,7 +39,7 @@
       async function submit(action) {
         message.className = "";
         message.textContent = "Please wait...";
-        const response = await fetch(`/u/${action}`, {
+        const response = await fetch(`/auth/${action}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",

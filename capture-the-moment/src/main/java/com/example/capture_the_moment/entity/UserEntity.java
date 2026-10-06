@@ -23,6 +23,8 @@ public class UserEntity {
     @Column(nullable = false)
     private String password;
 
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String avatar;
 
     @Column(nullable = false)

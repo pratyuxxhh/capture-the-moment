@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <title>Settings | Capture the Moment</title>
+    <style>
+      :root { font-family: Segoe UI, system-ui, sans-serif; color: #172033; }
+      body { margin: 0; background: #f4f6f8; }
+      header { display: flex; justify-content: space-between; padding: 20px 8%; background: #172033; color: white; }
+      header a { color: white; text-decoration: none; }
+      main { width: min(620px, calc(100% - 32px)); margin: 40px auto; }
+      section { padding: 24px; margin-top: 20px; background: white; border-radius: 14px; box-shadow: 0 8px 24px #17203312; }
+      form { display: grid; gap: 12px; } label { font-weight: 600; }
+      input { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #c9ced8; border-radius: 8px; font: inherit; }
+      button { padding: 11px 16px; border: 0; border-radius: 8px; background: #3155d9; color: white; font-weight: 700; cursor: pointer; }
+      .danger { background: #b42318; } .muted { color: #5b6475; } .message { min-height: 1.4em; }
+      .error { color: #b42318; } .avatar-preview { max-width: 120px; max-height: 120px; border-radius: 50%; }
+    </style>
+  </head>
+  <body>
+    <header><strong>Account settings</strong><a href="/dashboard">Back to dashboard</a></header>
+    <main>
+      <h1>Settings</h1>
+      <p id="message" class="message" role="status"></p>
+      <section>
+        <h2>Profile avatar</h2>
+        <p class="muted">Upload an image up to 2 MB. It is stored with your account.</p>
+        <form id="avatar-form">
+          <label for="avatar">Choose an image</label>
+          <input id="avatar" type="file" accept="image/*" required />
+          <button type="submit">Save avatar</button>
+        </form>
+      </section>
+      <section>
+        <h2>Change password</h2>
+        <form id="password-form">
+          <label for="current-password">Current password</label>
+          <input id="current-password" type="password" required autocomplete="current-password" />
+          <label for="new-password">New password</label>
+          <input id="new-password" type="password" minlength="8" required autocomplete="new-password" />
+          <button type="submit">Change password</button>
+        </form>
+      </section>
+      <section>
+        <h2>Session</h2>
+        <button id="logout">Log out</button>
+      </section>
+      <section>
+        <h2>Delete account</h2>
+        <p class="muted">This permanently deletes your account and cannot be undone.</p>
+        <button id="delete-account" class="danger">Delete account</button>
+      </section>
+    </main>
+    <script>
+      const message = document.getElementById("message");
+      function showMessage(text, error = false) {
+        message.textContent = text;
+        message.className = error ? "message error" : "message";
+      }
+      async function readResponse(response) {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || "Request failed.");
+        return payload;
+      }
+      function csrfHeaders() {
+        return {
+          [document.querySelector('meta[name="_csrf_header"]').content]:
+            document.querySelector('meta[name="_csrf"]').content
+        };
+      }
+      document.getElementById("avatar-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const data = new FormData();
+        data.append("avatar", document.getElementById("avatar").files[0]);
+        try {
+          showMessage("Saving avatar...");
+          showMessage((await readResponse(await fetch("/auth/account/avatar", {
+            method: "POST", headers: csrfHeaders(), body: data
+          }))).message);
+        } catch (error) { showMessage(error.message, true); }
+      });
+      document.getElementById("password-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        try {
+          showMessage("Changing password...");
+          const response = await fetch("/auth/account/password", {
+            method: "POST", headers: { "Content-Type": "application/json", ...csrfHeaders() },
+            body: JSON.stringify({
+              currentPassword: document.getElementById("current-password").value,
+              newPassword: document.getElementById("new-password").value
+            })
+          });
+          showMessage((await readResponse(response)).message);
+          event.target.reset();
+        } catch (error) { showMessage(error.message, true); }
+      });
+      document.getElementById("logout").addEventListener("click", async () => {
+        try {
+          await readResponse(await fetch("/auth/logout", { method: "POST", headers: csrfHeaders() }));
+          window.location.href = "/signin";
+        }
+        catch (error) { showMessage(error.message, true); }
+      });
+      document.getElementById("delete-account").addEventListener("click", async () => {
+        if (!confirm("Delete your account permanently?")) return;
+        try {
+          await readResponse(await fetch("/auth/account", { method: "DELETE", headers: csrfHeaders() }));
+          window.location.href = "/signin";
+        }
+        catch (error) { showMessage(error.message, true); }
+      });
+    </script>
+  </body>
+</html>

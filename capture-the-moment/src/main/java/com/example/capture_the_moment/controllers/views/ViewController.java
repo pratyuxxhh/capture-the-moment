@@ -23,4 +23,9 @@ public class ViewController {
     public String dashboard() {
         return "dashboard";
     }
+
+    @GetMapping("/settings")
+    public String settings() {
+        return "settings";
+    }
 }
