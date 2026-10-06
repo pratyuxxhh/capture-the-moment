@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.venv
+__pycache__
+*.py[cod]
+*.log
+audio/*
+!audio/.gitkeep
+uploads/*
+!uploads/.gitkeep
+dataset/*
+Dockerfile
+docker-compose.yml

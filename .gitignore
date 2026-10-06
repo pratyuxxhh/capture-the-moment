@@ -1,0 +1,103 @@
+# ==============================================================================
+# Environment & Secrets
+# ==============================================================================
+.env
+.env.*
+*.env
+!.env.example
+!**/.env.example
+*.license
+*.pem
+*.key
+*.cert
+*.crt
+
+# ==============================================================================
+# Java / Spring Boot / Maven
+# ==============================================================================
+target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/wrapper/maven-wrapper.jar
+HELP.md
+
+# ==============================================================================
+# Python / Virtual Environments / Caches
+# ==============================================================================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.venv/
+**/.venv/
+venv/
+**/venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==============================================================================
+# Temporary Audio, Uploads & Datasets
+# ==============================================================================
+transcription-service/audio/*
+!transcription-service/audio/.gitkeep
+transcription-service/uploads/*
+!transcription-service/uploads/.gitkeep
+transcription-service/dataset/*
+!transcription-service/dataset/.gitkeep
+*.wav
+*.mp3
+*.m4a
+*.mp4
+*.flac
+*.webm
+*.ogg
+
+# ==============================================================================
+# IDE & Editor Configurations
+# ==============================================================================
+.idea/
+**/.idea/
+.vscode/
+**/.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+.apt_generated
+.factorypath
+.springBeans
+.sts4-cache
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# ==============================================================================
+# Logs & Databases
+# ==============================================================================
+*.log
+logs/
+*.sqlite
+*.sqlite3
+*.db
+*.rdb
+
+# ==============================================================================
+# OS & Filesystem Metadata
+# ==============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/

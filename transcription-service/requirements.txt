@@ -1,0 +1,12 @@
+fastapi>=0.115.0,<1.0.0
+uvicorn>=0.32.0,<1.0.0
+faster-whisper>=1.1.0,<2.0.0
+python-multipart>=0.0.12
+python-dotenv>=1.0.0
+# faster-whisper 1.x still calls av.open(..., metadata_errors=...) which PyAV 16+ removed
+av>=11,<16
+# Install a CUDA-capable Linux wheel when the package index provides one. The
+# application still uses CPU automatically when no CUDA runtime is accessible.
+torch>=2.8.0,<3.0.0
+# Speaker diarization.
+pyannote.audio>=4.0.0,<5.0.0

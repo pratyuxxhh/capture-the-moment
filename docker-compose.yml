@@ -1,0 +1,94 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-myapp_local}
+      MYSQL_USER: ${MYSQL_USER:-spring}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-spring}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/aistor/minio:latest
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-admin12345}
+    command: server /data --license /minio.license --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+      - ./minio.license:/minio.license:ro
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio-init:
+    image: quay.io/minio/aistor/minio:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://minio:9000 $${MINIO_ROOT_USER:-admin} $${MINIO_ROOT_PASSWORD:-admin12345};
+      mc mb --ignore-existing minio/${MINIO_BUCKET_LOCAL:-capture-the-moment-local};
+      mc mb --ignore-existing minio/${MINIO_BUCKET_DOCKER:-capture-the-moment-docker};
+      exit 0;
+      "
+    restart: "no"
+
+  # --- FULL DOCKER PROFILE (Run with: docker compose --profile full up -d) ---
+
+  transcription-service:
+    profiles: ["full"]
+    image: pratyuxxhh/transcription-service:latest
+    environment:
+      HF_TOKEN: ${HF_TOKEN:?Set HF_TOKEN in the root .env file before starting}
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      HF_HOME: /home/appuser/.cache/huggingface
+    ports:
+      - "8000:8000"
+    volumes:
+      - huggingface-cache:/home/appuser/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  capture-the-moment:
+    profiles: ["full"]
+    image: pratyuxxhh/capture-the-moment:latest
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      mysql:
+        condition: service_healthy
+      transcription-service:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  huggingface-cache:
+  mysql-data:
+  minio-data:

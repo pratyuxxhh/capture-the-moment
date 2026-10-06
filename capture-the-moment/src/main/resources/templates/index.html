@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transcription Service</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Segoe UI, system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #f4f6f8;
+        color: #1f2933;
+      }
+      main {
+        max-width: 720px;
+        margin: 48px auto;
+        padding: 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 1.6rem;
+      }
+      p.hint {
+        color: #52606d;
+      }
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        margin: 24px 0;
+      }
+      input[type="file"] {
+        flex: 1 1 240px;
+      }
+      button {
+        background: #2563eb;
+        color: #fff;
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .status {
+        min-height: 1.4em;
+        color: #52606d;
+      }
+      .error {
+        color: #b91c1c;
+      }
+      .language {
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+      .segment {
+        padding: 12px 0;
+        border-top: 1px solid #e4e7eb;
+      }
+      .time {
+        font-size: 0.85rem;
+        color: #7b8794;
+        margin-bottom: 4px;
+      }
+      .json-title {
+        margin-top: 24px;
+        font-size: 1rem;
+      }
+      .json-response {
+        overflow-x: auto;
+        padding: 16px;
+        background: #f4f6f8;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Audio transcription</h1>
+      <p class="hint">
+        Upload an audio file (.mp3, .wav, .m4a, .flac, .ogg) and get a timestamped transcript.
+      </p>
+      <form id="upload-form">
+        <input
+          id="file"
+          name="file"
+          type="file"
+          accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*"
+          required
+        />
+        <button id="submit" type="submit">Get Transcription</button>
+      </form>
+      <form id="query-form">
+        <input id="query-input" type="text" placeholder="Enter a query" required />
+        <button type="submit">Show Query</button>
+      </form>
+      <p id="query-result"></p>
+      <p id="status" class="status"></p>
+      <section id="result" hidden></section>
+      <section id="json-result" hidden>
+        <h2 class="json-title">Response JSON</h2>
+        <pre id="json-response" class="json-response"></pre>
+      </section>
+    </main>
+    <script>
+      const form = document.getElementById("upload-form");
+      const fileInput = document.getElementById("file");
+      const button = document.getElementById("submit");
+      const statusEl = document.getElementById("status");
+      const resultEl = document.getElementById("result");
+      const jsonResultEl = document.getElementById("json-result");
+      const jsonResponseEl = document.getElementById("json-response");
+      const queryForm = document.getElementById("query-form");
+      const queryInput = document.getElementById("query-input");
+      const queryResult = document.getElementById("query-result");
+
+      queryForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const response = await fetch(
+          `/query?query=${encodeURIComponent(queryInput.value)}`
+        );
+        const payload = await response.text();
+        queryResult.textContent = response.ok ? payload : payload || "Query failed.";
+      });
+
+      function formatTime(seconds) {
+        return Number(seconds).toFixed(2);
+      }
+
+      async function readResponse(response) {
+        const text = await response.text();
+        let payload = null;
+
+        try {
+          payload = text ? JSON.parse(text) : null;
+        } catch (error) {
+          if (!response.ok) {
+            throw new Error(text || `Server error (${response.status}).`);
+          }
+          throw new Error("The server returned an invalid transcription response.");
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            payload?.message ||
+              payload?.detail ||
+              payload?.error ||
+              `Request failed (${response.status}).`
+          );
+        }
+
+        if (!payload || typeof payload !== "object") {
+          throw new Error("The server returned an empty transcription response.");
+        }
+
+        return payload;
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const file = fileInput.files[0];
+        if (!file) {
+          statusEl.textContent = "Choose an audio file first.";
+          statusEl.classList.add("error");
+          return;
+        }
+
+        const data = new FormData();
+        data.append("file", file);
+
+        button.disabled = true;
+        statusEl.classList.remove("error");
+        statusEl.textContent = "Transcribing… this can take a while on CPU.";
+        resultEl.hidden = true;
+        resultEl.innerHTML = "";
+        jsonResultEl.hidden = true;
+        jsonResponseEl.textContent = "";
+
+        try {
+          const response = await fetch("http://localhost:8080/api/transcribe", {
+            method: "POST",
+            body: data,
+          });
+          const payload = await readResponse(response);
+          console.log("Transcription response:", payload);
+
+          statusEl.textContent = "Done.";
+          jsonResponseEl.textContent = JSON.stringify(payload, null, 2);
+          jsonResultEl.hidden = false;
+          const language = document.createElement("p");
+          language.className = "language";
+          language.textContent = "Detected language: " + payload.language;
+          resultEl.appendChild(language);
+
+          if (!payload.segments || payload.segments.length === 0) {
+            const empty = document.createElement("p");
+            empty.textContent = "No speech segments were detected.";
+            resultEl.appendChild(empty);
+          } else {
+            payload.segments.forEach((segment) => {
+              const item = document.createElement("div");
+              item.className = "segment";
+              item.innerHTML =
+                '<div class="time">' +
+                (segment.speaker || "UNKNOWN") +
+                " · " +
+                formatTime(segment.start) +
+                "s – " +
+                formatTime(segment.end) +
+                "s</div>" +
+                "<div></div>";
+              item.lastChild.textContent = segment.text;
+              resultEl.appendChild(item);
+            });
+          }
+          resultEl.hidden = false;
+        } catch (error) {
+          statusEl.classList.add("error");
+          statusEl.textContent =
+            error instanceof TypeError
+              ? "Could not connect to the server. Check that the application is running and try again."
+              : error.message || "Transcription failed. Please try again.";
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

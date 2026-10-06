@@ -1,0 +1,5 @@
+CREATE DATABASE IF NOT EXISTS myapp_local;
+CREATE DATABASE IF NOT EXISTS myapp_docker;
+GRANT ALL PRIVILEGES ON myapp_local.* TO 'spring'@'%';
+GRANT ALL PRIVILEGES ON myapp_docker.* TO 'spring'@'%';
+FLUSH PRIVILEGES;

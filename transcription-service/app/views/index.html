@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Transcription Service</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Segoe UI, system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #f4f6f8;
+        color: #1f2933;
+      }
+      main {
+        max-width: 720px;
+        margin: 48px auto;
+        padding: 32px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 1.6rem;
+      }
+      p.hint {
+        color: #52606d;
+      }
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        margin: 24px 0;
+      }
+      input[type="file"] {
+        flex: 1 1 240px;
+      }
+      button {
+        background: #2563eb;
+        color: #fff;
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .status {
+        min-height: 1.4em;
+        color: #52606d;
+      }
+      .error {
+        color: #b91c1c;
+      }
+      .language {
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+      .segment {
+        padding: 12px 0;
+        border-top: 1px solid #e4e7eb;
+      }
+      .time {
+        font-size: 0.85rem;
+        color: #7b8794;
+        margin-bottom: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Audio transcription</h1>
+      <p class="hint">
+        Upload an audio file (.mp3, .wav, .m4a, .flac, .ogg) and get a timestamped transcript.
+      </p>
+      <form id="upload-form">
+        <input
+          id="file"
+          name="file"
+          type="file"
+          accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*"
+          required
+        />
+        <button id="submit" type="submit">Get Transcription</button>
+      </form>
+      <form id="query-form">
+        <input id="query-input" type="text" placeholder="Enter a query" required />
+        <button type="submit">Show Query</button>
+      </form>
+      <p id="query-result"></p>
+      <p id="status" class="status"></p>
+      <section id="result" hidden></section>
+    </main>
+    <script>
+      const form = document.getElementById("upload-form");
+      const fileInput = document.getElementById("file");
+      const button = document.getElementById("submit");
+      const statusEl = document.getElementById("status");
+      const resultEl = document.getElementById("result");
+      const queryForm = document.getElementById("query-form");
+      const queryInput = document.getElementById("query-input");
+      const queryResult = document.getElementById("query-result");
+
+      queryForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const response = await fetch(
+          `/query?query=${encodeURIComponent(queryInput.value)}`
+        );
+        const payload = await response.text();
+        queryResult.textContent = response.ok ? payload : payload || "Query failed.";
+      });
+
+      function formatTime(seconds) {
+        return Number(seconds).toFixed(2);
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const file = fileInput.files[0];
+        if (!file) {
+          statusEl.textContent = "Choose an audio file first.";
+          statusEl.classList.add("error");
+          return;
+        }
+
+        const data = new FormData();
+        data.append("file", file);
+
+        button.disabled = true;
+        statusEl.classList.remove("error");
+        statusEl.textContent = "Transcribing… this can take a while on CPU.";
+        resultEl.hidden = true;
+        resultEl.innerHTML = "";
+
+        try {
+          const response = await fetch("/transcribe", {
+            method: "POST",
+            body: data,
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            const detail = payload.detail || "Transcription failed.";
+            throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+          }
+
+          statusEl.textContent = "Done.";
+          const language = document.createElement("p");
+          language.className = "language";
+          language.textContent = "Detected language: " + payload.language;
+          resultEl.appendChild(language);
+
+          if (!payload.segments || payload.segments.length === 0) {
+            const empty = document.createElement("p");
+            empty.textContent = "No speech segments were detected.";
+            resultEl.appendChild(empty);
+          } else {
+            payload.segments.forEach((segment) => {
+              const item = document.createElement("div");
+              item.className = "segment";
+              item.innerHTML =
+                '<div class="time">' +
+                (segment.speaker || "UNKNOWN") +
+                " · " +
+                formatTime(segment.start) +
+                "s – " +
+                formatTime(segment.end) +
+                "s</div>" +
+                "<div></div>";
+              item.lastChild.textContent = segment.text;
+              resultEl.appendChild(item);
+            });
+          }
+          resultEl.hidden = false;
+        } catch (error) {
+          statusEl.classList.add("error");
+          statusEl.textContent = error.message || "Transcription failed.";
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
