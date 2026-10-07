@@ -3,41 +3,117 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <title>Dashboard | Capture the Moment</title>
     <style>
       :root { font-family: Segoe UI, system-ui, sans-serif; color: #172033; }
       body { margin: 0; background: #f4f6f8; }
       header { display: flex; justify-content: space-between; align-items: center; padding: 20px 8%; background: #172033; color: white; }
       header a { color: white; text-decoration: none; padding: 8px 12px; border: 1px solid #ffffff66; border-radius: 8px; }
-      main { width: min(720px, calc(100% - 32px)); margin: 40px auto; }
-      section { padding: 28px; margin-top: 24px; background: white; border-radius: 14px; box-shadow: 0 8px 24px #17203312; }
+      main { width: min(820px, calc(100% - 32px)); margin: 40px auto; }
+      section, article { padding: 24px; margin-top: 20px; background: white; border-radius: 14px; box-shadow: 0 8px 24px #17203312; }
       form { display: grid; gap: 12px; } label { font-weight: 600; }
-      input, textarea { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #c9ced8; border-radius: 8px; font: inherit; }
-      textarea { min-height: 110px; resize: vertical; }
+      input { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #c9ced8; border-radius: 8px; font: inherit; }
       button { padding: 11px 16px; border: 0; border-radius: 8px; background: #3155d9; color: white; font-weight: 700; cursor: pointer; }
-      .muted { color: #5b6475; }
+      .muted { color: #5b6475; } .message { min-height: 1.4em; }
+      .error { color: #b42318; } .projects { display: grid; gap: 12px; }
+      .project { display: flex; justify-content: space-between; align-items: center; gap: 16px; cursor: pointer; }
+      .project:hover { box-shadow: 0 10px 28px #17203324; transform: translateY(-1px); transition: 0.15s ease; }
+      .project a { color: #3155d9; font-weight: 700; }
     </style>
   </head>
   <body>
-    <header>
-      <strong>Capture the Moment</strong>
-      <a href="/settings">Settings</a>
-    </header>
+    <header><strong>Capture the Moment</strong><a href="/settings">Account settings</a></header>
     <main>
       <h1>Your dashboard</h1>
-      <p class="muted">You are authenticated. Create a project request below.</p>
+      <p class="muted">Create a project and invite your team when you are ready.</p>
+      <p id="message" class="message" role="status"></p>
       <section>
         <h2>New project</h2>
-        <form action="/projects" method="post">
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-          <label for="name">Project name</label>
-          <input id="name" name="name" required maxlength="100" />
-          <label for="description">Description</label>
-          <textarea id="description" name="description" maxlength="1000"></textarea>
+        <form id="project-form">
+          <label for="project-name">Project name</label>
+          <input id="project-name" name="projectName" required maxlength="100" />
           <button type="submit">Create project</button>
         </form>
-        <p class="muted">Project creation is not available yet.</p>
+      </section>
+      <section>
+        <h2>Your projects</h2>
+        <div id="projects" class="projects"><p class="muted">Loading projects...</p></div>
       </section>
     </main>
+    <script>
+      const message = document.getElementById("message");
+      const projects = document.getElementById("projects");
+      const csrf = () => ({
+        [document.querySelector('meta[name="_csrf_header"]').content]:
+          document.querySelector('meta[name="_csrf"]').content
+      });
+      async function responseData(response) {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || data.message || "Request failed.");
+        return data;
+      }
+      function showMessage(text, error = false) {
+        message.textContent = text;
+        message.className = error ? "message error" : "message";
+      }
+      function renderProjects(items) {
+        projects.replaceChildren();
+        if (!items.length) {
+          projects.innerHTML = '<p class="muted">No projects yet.</p>';
+          return;
+        }
+        items.forEach(project => {
+          const article = document.createElement("article");
+          article.className = "project";
+          article.tabIndex = 0;
+          article.setAttribute("role", "link");
+          article.setAttribute("aria-label", `Open ${project.projectName}`);
+          article.innerHTML = `<div><strong></strong><div class="muted"></div></div>`;
+          article.querySelector("strong").textContent = project.projectName;
+          article.querySelector(".muted").textContent =
+            `Created by ${project.createdBy} on ${new Date(project.createdAt).toLocaleString()} · ${project.role}`;
+          if (project.admin) {
+            const link = document.createElement("a");
+            link.href = `/projects/${project.projectId}/settings`;
+            link.textContent = "Project settings";
+            link.addEventListener("click", event => event.stopPropagation());
+            article.append(link);
+          }
+          const openProject = () => {
+            window.location.href = `/project-name?projectId=${encodeURIComponent(project.projectId)}`;
+          };
+          article.addEventListener("click", openProject);
+          article.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              openProject();
+            }
+          });
+          projects.append(article);
+        });
+      }
+      async function loadProjects() {
+        try { renderProjects(await responseData(await fetch("/project"))); }
+        catch (error) { projects.innerHTML = ""; showMessage(error.message, true); }
+      }
+      document.getElementById("project-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        try {
+          showMessage("Creating project...");
+          const projectName = document.getElementById("project-name").value;
+          await responseData(await fetch("/project", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...csrf() },
+            body: JSON.stringify({ projectName })
+          }));
+          event.target.reset();
+          showMessage("Project created successfully.");
+          await loadProjects();
+        } catch (error) { showMessage(error.message, true); }
+      });
+      loadProjects();
+    </script>
   </body>
 </html>

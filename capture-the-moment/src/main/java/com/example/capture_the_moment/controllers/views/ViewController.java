@@ -28,4 +28,14 @@ public class ViewController {
     public String settings() {
         return "settings";
     }
+
+    @GetMapping("/projects/{projectId}/settings")
+    public String projectSettings() {
+        return "project-settings";
+    }
+
+    @GetMapping("/project-name")
+    public String projectWorkspace() {
+        return "project-workspace";
+    }
 }

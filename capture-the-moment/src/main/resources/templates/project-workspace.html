@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <title>Project | Capture the Moment</title>
+    <style>
+      :root { font-family: Segoe UI, system-ui, sans-serif; color: #172033; }
+      body { margin: 0; min-height: 100vh; background: #f4f6f8; }
+      .layout { display: flex; min-height: 100vh; }
+      aside { box-sizing: border-box; width: 260px; padding: 28px 18px; background: #172033; color: white; }
+      .brand { display: block; margin: 0 12px 36px; font-weight: 700; }
+      .back { display: block; margin: 0 8px 28px; color: #d8e0ff; text-decoration: none; }
+      nav { display: grid; gap: 8px; }
+      nav button { border: 0; border-radius: 8px; padding: 13px 14px; color: #d8e0ff; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+      nav button:hover, nav button.active { color: white; background: #3155d9; }
+      main { flex: 1; padding: 44px clamp(24px, 7vw, 96px); }
+      .content { max-width: 840px; padding: 32px; background: white; border-radius: 16px; box-shadow: 0 8px 24px #17203312; }
+      h1 { margin-top: 0; } .muted { color: #5b6475; }
+      @media (max-width: 640px) {
+        .layout { display: block; }
+        aside { width: 100%; min-height: auto; padding: 20px; }
+        .brand { margin-bottom: 20px; } .back { margin-bottom: 16px; }
+        nav { grid-template-columns: repeat(2, 1fr); }
+        main { padding: 24px 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside>
+        <span class="brand">Capture the Moment</span>
+        <a class="back" href="/dashboard">&larr; Back to dashboard</a>
+        <nav aria-label="Project sections">
+          <button class="active" type="button" data-section="audios">Audios</button>
+          <button type="button" data-section="transcription">Transcription</button>
+          <button type="button" data-section="kanban">Kanban</button>
+          <button type="button" data-section="chit-chat">Chit-chat</button>
+        </nav>
+      </aside>
+      <main>
+        <section class="content" aria-live="polite">
+          <h1 id="project-title">Project</h1>
+          <p id="section-description" class="muted">Select a section from the project menu.</p>
+        </section>
+      </main>
+    </div>
+    <script>
+      const descriptions = {
+        audios: "Upload and manage the audio files for this project.",
+        transcription: "Review and manage transcriptions for this project.",
+        kanban: "Organize project work with a kanban board.",
+        "chit-chat": "Collaborate with your project members in chit-chat."
+      };
+      const params = new URLSearchParams(window.location.search);
+      const projectId = params.get("projectId");
+      const title = document.getElementById("project-title");
+      const description = document.getElementById("section-description");
+      async function loadProject() {
+        if (!projectId) return;
+        const response = await fetch("/project");
+        if (!response.ok) return;
+        const project = (await response.json()).find(item => String(item.projectId) === projectId);
+        if (project) title.textContent = project.projectName;
+      }
+      document.querySelectorAll("[data-section]").forEach(button => {
+        button.addEventListener("click", () => {
+          document.querySelector(".active").classList.remove("active");
+          button.classList.add("active");
+          description.textContent = descriptions[button.dataset.section];
+        });
+      });
+      loadProject();
+    </script>
+  </body>
+</html>
