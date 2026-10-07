@@ -21,6 +21,11 @@ public class Transcript {
     @JoinColumn(name = "audio_id", nullable = false)
     private Audio audio;
 
+    private String language;
+
+    @Column(columnDefinition = "TEXT")
+    private String fullText;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 }

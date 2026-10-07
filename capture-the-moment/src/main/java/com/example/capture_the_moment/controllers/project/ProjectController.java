@@ -56,7 +56,36 @@ public class ProjectController {
         return ResponseEntity.ok(Map.of("message", "Project deleted successfully."));
     }
 
+    @GetMapping("/{projectId}/members")
+    public List<MemberResponse> getMembers(@PathVariable Long projectId,
+                                           @AuthenticationPrincipal UserDetails user) {
+        return projectService.findMembers(projectId, user.getUsername()).stream()
+                .map(MemberResponse::from)
+                .toList();
+    }
+
+    @PostMapping("/{projectId}/members")
+    public ResponseEntity<MemberResponse> addMember(@PathVariable Long projectId,
+                                                    @AuthenticationPrincipal UserDetails user,
+                                                    @RequestBody MemberRequest request) {
+        Member member = projectService.addMember(projectId, user.getUsername(), request.username());
+        return ResponseEntity.status(201).body(MemberResponse.from(member));
+    }
+
     public record ProjectRequest(String projectName) {
+    }
+
+    public record MemberRequest(String username) {
+    }
+
+    public record MemberResponse(Long userId, String username, String role, String joinedAt) {
+        static MemberResponse from(Member member) {
+            return new MemberResponse(
+                    member.getUser().getUserId(),
+                    member.getUser().getUsername(),
+                    member.getRole(),
+                    member.getJoinedAt().toString());
+        }
     }
 
     public record ProjectResponse(Long projectId, String projectName, String inviteCode,

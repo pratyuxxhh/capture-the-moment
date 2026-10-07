@@ -15,5 +15,8 @@ public interface MemberRepository extends JpaRepository<Member, MemberId> {
     @EntityGraph(attributePaths = {"project", "project.createdBy"})
     Optional<Member> findByProjectProjectIdAndUserUsername(Long projectId, String username);
 
+    @EntityGraph(attributePaths = {"user"})
+    List<Member> findByProjectProjectIdOrderByJoinedAtAsc(Long projectId);
+
     void deleteAllByProjectProjectId(Long projectId);
 }

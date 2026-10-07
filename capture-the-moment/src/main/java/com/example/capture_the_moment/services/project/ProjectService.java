@@ -23,13 +23,16 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
+    private final InviteService inviteService;
 
     public ProjectService(ProjectRepository projectRepository,
                           MemberRepository memberRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          InviteService inviteService) {
         this.projectRepository = projectRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
+        this.inviteService = inviteService;
     }
 
     @Transactional
@@ -72,6 +75,17 @@ public class ProjectService {
     }
 
     @Transactional
+    public List<Member> findMembers(Long projectId, String username) {
+        requireMembership(projectId, username);
+        return memberRepository.findByProjectProjectIdOrderByJoinedAtAsc(projectId);
+    }
+
+    @Transactional
+    public Member addMember(Long projectId, String username, String memberUsername) {
+        return inviteService.inviteMember(projectId, username, memberUsername);
+    }
+
+    @Transactional
     public void deleteProject(Long projectId, String username) {
         requireAdmin(projectId, username);
         memberRepository.deleteAllByProjectProjectId(projectId);
@@ -79,14 +93,18 @@ public class ProjectService {
     }
 
     private Member requireAdmin(Long projectId, String username) {
-        Member member = memberRepository.findByProjectProjectIdAndUserUsername(projectId, username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "You are not a member of this project."));
+        Member member = requireMembership(projectId, username);
         if (!ADMIN_ROLE.equalsIgnoreCase(member.getRole())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Only project administrators can change project settings.");
         }
         return member;
+    }
+
+    private Member requireMembership(Long projectId, String username) {
+        return memberRepository.findByProjectProjectIdAndUserUsername(projectId, username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "You are not a member of this project."));
     }
 
     private UserEntity findUser(String username) {

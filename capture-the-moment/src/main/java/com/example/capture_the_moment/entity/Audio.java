@@ -27,6 +27,9 @@ public class Audio {
     @Column(nullable = false)
     private String filePath;
 
+    @Column(nullable = false)
+    private String contentType;
+
     private Double duration;
 
     private String status;
