@@ -46,49 +46,10 @@ services:
       /bin/sh -c "
       mc alias set minio http://minio:9000 $${MINIO_ROOT_USER:-admin} $${MINIO_ROOT_PASSWORD:-admin12345};
       mc mb --ignore-existing minio/${MINIO_BUCKET_LOCAL:-capture-the-moment-local};
-      mc mb --ignore-existing minio/${MINIO_BUCKET_DOCKER:-capture-the-moment-docker};
       exit 0;
       "
     restart: "no"
 
-  # --- FULL DOCKER PROFILE (Run with: docker compose --profile full up -d) ---
-
-  transcription-service:
-    profiles: ["full"]
-    image: pratyuxxhh/transcription-service:latest
-    environment:
-      HF_TOKEN: ${HF_TOKEN:?Set HF_TOKEN in the root .env file before starting}
-      WHISPER_MODEL: ${WHISPER_MODEL:-base}
-      HF_HOME: /home/appuser/.cache/huggingface
-    ports:
-      - "8000:8000"
-    volumes:
-      - huggingface-cache:/home/appuser/.cache/huggingface
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    restart: unless-stopped
-
-  capture-the-moment:
-    profiles: ["full"]
-    image: pratyuxxhh/capture-the-moment:latest
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-    depends_on:
-      mysql:
-        condition: service_healthy
-      transcription-service:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
-    ports:
-      - "8080:8080"
-    restart: unless-stopped
-
 volumes:
-  huggingface-cache:
   mysql-data:
   minio-data:
