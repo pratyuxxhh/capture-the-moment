@@ -3,8 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="_csrf" th:content="${_csrf.token}" />
-    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <script src="/js/auth.js"></script>
     <title>Settings | Capture the Moment</title>
     <style>
       :root { font-family: Segoe UI, system-ui, sans-serif; color: #172033; }
@@ -65,12 +64,6 @@
         if (!response.ok) throw new Error(payload.message || "Request failed.");
         return payload;
       }
-      function csrfHeaders() {
-        return {
-          [document.querySelector('meta[name="_csrf_header"]').content]:
-            document.querySelector('meta[name="_csrf"]').content
-        };
-      }
       document.getElementById("avatar-form").addEventListener("submit", async event => {
         event.preventDefault();
         const data = new FormData();
@@ -78,7 +71,7 @@
         try {
           showMessage("Saving avatar...");
           showMessage((await readResponse(await fetch("/auth/account/avatar", {
-            method: "POST", headers: csrfHeaders(), body: data
+            method: "POST", body: data
           }))).message);
         } catch (error) { showMessage(error.message, true); }
       });
@@ -87,7 +80,7 @@
         try {
           showMessage("Changing password...");
           const response = await fetch("/auth/account/password", {
-            method: "POST", headers: { "Content-Type": "application/json", ...csrfHeaders() },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               currentPassword: document.getElementById("current-password").value,
               newPassword: document.getElementById("new-password").value
@@ -99,7 +92,8 @@
       });
       document.getElementById("logout").addEventListener("click", async () => {
         try {
-          await readResponse(await fetch("/auth/logout", { method: "POST", headers: csrfHeaders() }));
+          await readResponse(await fetch("/auth/logout", { method: "POST" }));
+          window.captureAuth.clearToken();
           window.location.href = "/signin";
         }
         catch (error) { showMessage(error.message, true); }
@@ -107,7 +101,8 @@
       document.getElementById("delete-account").addEventListener("click", async () => {
         if (!confirm("Delete your account permanently?")) return;
         try {
-          await readResponse(await fetch("/auth/account", { method: "DELETE", headers: csrfHeaders() }));
+          await readResponse(await fetch("/auth/account", { method: "DELETE" }));
+          window.captureAuth.clearToken();
           window.location.href = "/signin";
         }
         catch (error) { showMessage(error.message, true); }

@@ -16,6 +16,7 @@ import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import io.minio.GetObjectResponse;
 import io.minio.errors.MinioException;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.security.MessageDigest;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
@@ -48,6 +50,7 @@ public class AudioService {
     private final MemberRepository memberRepository;
     private final ObjectMapper objectMapper;
     private final String bucket;
+    private final TranscriptionSegmentService transcriptionSegmentService;
 
     public AudioService(
             MinioClient minioClient,
@@ -57,6 +60,7 @@ public class AudioService {
             ProjectRepository projectRepository,
             MemberRepository memberRepository,
             ObjectMapper objectMapper,
+            TranscriptionSegmentService transcriptionSegmentService,
             @Value("${storage.s3.bucket}") String bucket) {
         this.minioClient = minioClient;
         this.audioRepository = audioRepository;
@@ -65,6 +69,7 @@ public class AudioService {
         this.projectRepository = projectRepository;
         this.memberRepository = memberRepository;
         this.objectMapper = objectMapper;
+        this.transcriptionSegmentService = transcriptionSegmentService;
         this.bucket = bucket;
     }
 
@@ -79,6 +84,17 @@ public class AudioService {
         String originalName = file.getOriginalFilename() == null
                 ? "audio"
                 : Paths.get(file.getOriginalFilename()).getFileName().toString();
+        String contentHash;
+        try {
+            contentHash = sha256(file.getBytes());
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not read the audio file.", exception);
+        }
+        if (audioRepository.existsByProjectProjectIdAndContentHash(projectId, contentHash)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This audio already exists in the project.");
+        }
+        originalName = transcriptionSegmentService.uniqueFileName(projectId, originalName);
         String contentType = file.getContentType() == null
                 ? MediaType.APPLICATION_OCTET_STREAM_VALUE : file.getContentType();
         String objectName = "projects/" + projectId + "/audios/"
@@ -102,11 +118,28 @@ public class AudioService {
         Audio audio = new Audio();
         audio.setProject(project);
         audio.setFileName(originalName);
+        audio.setOriginalFileName(file.getOriginalFilename() == null
+                ? "audio"
+                : Paths.get(file.getOriginalFilename()).getFileName().toString());
+        audio.setContentHash(contentHash);
         audio.setFilePath(objectName);
         audio.setContentType(contentType);
         audio.setStatus("UPLOADED");
         audio.setUploadedAt(LocalDateTime.now());
         return audioRepository.save(audio);
+    }
+
+    private String sha256(byte[] content) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(content);
+            StringBuilder hash = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                hash.append(String.format("%02x", value));
+            }
+            return hash.toString();
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is not available.", exception);
+        }
     }
 
     public List<Audio> findAudios(Long projectId, String username) {
@@ -123,6 +156,29 @@ public class AudioService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Audio not found.");
         }
         return audio;
+    }
+
+    @Transactional
+    public void deleteAudio(Long projectId, Long audioId, String username) {
+        Audio audio = findAudio(projectId, audioId, username);
+        try {
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(audio.getFilePath())
+                    .build());
+        } catch (Exception exception) {
+            log.error("Could not delete audio object '{}'.", audio.getFilePath(), exception);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "The audio file could not be removed from storage.", exception);
+        }
+
+        transcriptRepository.findByAudioAudioId(audioId).ifPresent(transcript -> {
+            segmentRepository.deleteAll(
+                    segmentRepository.findByTranscriptTranscriptIdOrderBySequenceAsc(
+                            transcript.getTranscriptId()));
+            transcriptRepository.delete(transcript);
+        });
+        audioRepository.delete(audio);
     }
 
     public GetObjectResponse openAudio(Audio audio) {
@@ -179,7 +235,6 @@ public class AudioService {
         Transcript transcript = transcriptRepository.findByAudioAudioId(audioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Transcription is not available yet."));
-        transcript.setAudio(null);
         return transcript;
     }
 

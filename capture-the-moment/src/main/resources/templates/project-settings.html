@@ -3,8 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="_csrf" th:content="${_csrf.token}" />
-    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <script src="/js/auth.js"></script>
     <title>Project settings | Capture the Moment</title>
     <style>
       :root { font-family: Segoe UI, system-ui, sans-serif; color: #172033; }
@@ -39,10 +38,6 @@
     <script>
       const projectId = window.location.pathname.split("/")[2];
       const message = document.getElementById("message");
-      const csrf = () => ({
-        [document.querySelector('meta[name="_csrf_header"]').content]:
-          document.querySelector('meta[name="_csrf"]').content
-      });
       async function read(response) {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.detail || data.message || "Request failed.");
@@ -60,7 +55,7 @@
         event.preventDefault();
         try {
           await read(await fetch(`/project/${projectId}`, {
-            method: "PATCH", headers: { "Content-Type": "application/json", ...csrf() },
+            method: "PATCH", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ projectName: document.getElementById("project-name").value })
           }));
           message.textContent = "Project settings saved.";
@@ -69,7 +64,7 @@
       document.getElementById("delete-project").addEventListener("click", async () => {
         if (!confirm("Delete this project permanently?")) return;
         try {
-          await read(await fetch(`/project/${projectId}`, { method: "DELETE", headers: csrf() }));
+          await read(await fetch(`/project/${projectId}`, { method: "DELETE" }));
           window.location.href = "/dashboard";
         } catch (error) { message.textContent = error.message; message.className = "error"; }
       });

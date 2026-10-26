@@ -4,6 +4,7 @@ import com.example.capture_the_moment.entity.Audio;
 import com.example.capture_the_moment.entity.Transcript;
 import com.example.capture_the_moment.entity.TranscriptSegment;
 import com.example.capture_the_moment.services.audio.AudioService;
+import com.example.capture_the_moment.services.audio.TranscriptionSegmentService;
 import io.minio.GetObjectResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
@@ -15,6 +16,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,12 +35,15 @@ import java.util.List;
 public class AudioController {
     private final RestClient restClient;
     private final AudioService audioService;
+    private final TranscriptionSegmentService transcriptionService;
 
     public AudioController(
             @Value("${transcription.service.url}") String transcriptionServiceUrl,
-            AudioService audioService) {
+            AudioService audioService,
+            TranscriptionSegmentService transcriptionService) {
         this.restClient = createRestClient(transcriptionServiceUrl);
         this.audioService = audioService;
+        this.transcriptionService = transcriptionService;
     }
 
     @PostMapping(value = "/transcribe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -85,7 +90,7 @@ public class AudioController {
                     .body(body)
                     .retrieve()
                     .body(String.class);
-            audioService.saveTranscript(audio, transcription);
+            transcriptionService.saveTranscript(audio, transcription);
             return ResponseEntity.ok(AudioResponse.from(audio));
         } catch (ResourceAccessException exception) {
             return errorResponse(503, "The transcription service is unavailable or took too long to respond.");
@@ -100,6 +105,14 @@ public class AudioController {
         return audioService.findAudios(projectId, user.getUsername()).stream()
                 .map(AudioResponse::from)
                 .toList();
+    }
+
+    @DeleteMapping("/project/{projectId}/audios/{audioId}")
+    public ResponseEntity<Void> deleteProjectAudio(@PathVariable Long projectId,
+                                                   @PathVariable Long audioId,
+                                                   @AuthenticationPrincipal UserDetails user) {
+        audioService.deleteAudio(projectId, audioId, user.getUsername());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/project/{projectId}/audios/{audioId}/content")
@@ -138,10 +151,11 @@ public class AudioController {
         }
     }
 
-    public record TranscriptResponse(Long transcriptId, String language, String text,
+    public record TranscriptResponse(Long transcriptId, String fileName, String language, String text,
                                      String createdAt, List<SegmentResponse> segments) {
         static TranscriptResponse from(Transcript transcript, List<SegmentResponse> segments) {
-            return new TranscriptResponse(transcript.getTranscriptId(), transcript.getLanguage(),
+            return new TranscriptResponse(transcript.getTranscriptId(),
+                    transcript.getAudio().getFileName(), transcript.getLanguage(),
                     transcript.getFullText(), transcript.getCreatedAt().toString(), segments);
         }
     }

@@ -24,15 +24,18 @@ public class ProjectService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final InviteService inviteService;
+    private final ChatService chatService;
 
     public ProjectService(ProjectRepository projectRepository,
                           MemberRepository memberRepository,
                           UserRepository userRepository,
-                          InviteService inviteService) {
+                          InviteService inviteService,
+                          ChatService chatService) {
         this.projectRepository = projectRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.inviteService = inviteService;
+        this.chatService = chatService;
     }
 
     @Transactional
@@ -88,6 +91,7 @@ public class ProjectService {
     @Transactional
     public void deleteProject(Long projectId, String username) {
         requireAdmin(projectId, username);
+        chatService.deleteProjectChat(projectId);
         memberRepository.deleteAllByProjectProjectId(projectId);
         projectRepository.deleteById(projectId);
     }

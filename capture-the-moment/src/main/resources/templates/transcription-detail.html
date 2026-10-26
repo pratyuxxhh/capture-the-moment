@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/project-shell :: head('Transcription details')}"></head>
+<body>
+<div th:replace="~{fragments/project-shell :: shell('transcription', ~{::page})}">
+  <th:block th:fragment="page">
+    <a class="back-link" th:href="@{/projects/{id}/transcription(id=${projectId})}">
+      &larr; Back to transcriptions
+    </a>
+    <h1 id="transcription-title">Transcription</h1>
+    <p id="transcription-language" class="muted"></p>
+    <p id="transcription-text"></p>
+    <div id="transcription-segments" class="transcript-list"></div>
+  </th:block>
+</div>
+<script th:inline="javascript">
+  const projectId = /*[[${projectId}]]*/ 0;
+  const audioId = /*[[${audioId}]]*/ 0;
+  const title = document.getElementById("transcription-title");
+  const language = document.getElementById("transcription-language");
+  const fullText = document.getElementById("transcription-text");
+  const segments = document.getElementById("transcription-segments");
+
+  async function read(response) {
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || data.message || "Request failed.");
+    return data;
+  }
+
+  function time(seconds) {
+    const total = Math.max(0, Number(seconds) || 0);
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(Math.floor(total % 60)).padStart(2, "0")}`;
+  }
+
+  async function load() {
+    const transcript = await read(await fetch(
+      `/api/project/${projectId}/audios/${audioId}/transcription`));
+    title.textContent = transcript.fileName || "Transcription";
+    if (transcript.language) language.textContent = `Language: ${transcript.language}`;
+    if (transcript.text) fullText.textContent = transcript.text;
+    if (!transcript.segments || !transcript.segments.length) {
+      segments.innerHTML = '<p class="muted">No dialogue segments are available.</p>';
+      return;
+    }
+    transcript.segments.forEach(segment => {
+      const row = document.createElement("article");
+      row.className = "transcript-item";
+      const speaker = document.createElement("strong");
+      speaker.textContent = segment.speaker || "UNKNOWN";
+      const timing = document.createElement("span");
+      timing.className = "muted";
+      timing.textContent = ` · ${time(segment.start)} – ${time(segment.end)}`;
+      const text = document.createElement("p");
+      text.textContent = segment.text || "";
+      row.append(speaker, timing, text);
+      segments.append(row);
+    });
+  }
+
+  load().catch(error => {
+    segments.textContent = error.message;
+    segments.className = "error";
+  });
+</script>
+</body>
+</html>

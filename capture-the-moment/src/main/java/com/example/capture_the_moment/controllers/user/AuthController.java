@@ -3,16 +3,13 @@ package com.example.capture_the_moment.controllers.user;
 import com.example.capture_the_moment.entity.SignInDTO;
 import com.example.capture_the_moment.entity.ChangePasswordDTO;
 import com.example.capture_the_moment.services.user.AuthService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import com.example.capture_the_moment.filters.JwtFilter;
+import com.example.capture_the_moment.utils.JwtUtils;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,11 +27,12 @@ import org.springframework.security.core.userdetails.UserDetails;
 public class AuthController {
     private final AuthService userService;
     private final AuthenticationManager authenticationManager;
-    private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
+    private final JwtUtils jwtUtils;
 
-    public AuthController(AuthService userService, AuthenticationManager authenticationManager) {
+    public AuthController(AuthService userService, AuthenticationManager authenticationManager, JwtUtils jwtUtils) {
         this.userService = userService;
         this.authenticationManager = authenticationManager;
+        this.jwtUtils = jwtUtils;
     }
 
     //signin user
@@ -44,9 +42,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody SignInDTO user,
-                                   HttpServletRequest request,
-                                   HttpServletResponse response) {
+    public ResponseEntity<?> login(@RequestBody SignInDTO user) {
         final Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
@@ -55,13 +51,13 @@ public class AuthController {
             return ResponseEntity.status(401).body(java.util.Map.of(
                     "message", "Invalid username or password."));
         }
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authentication);
-        SecurityContextHolder.setContext(context);
-        securityContextRepository.saveContext(context, request, response);
-        return ResponseEntity.ok(java.util.Map.of(
-                "message", "Logged in successfully.",
-                "redirect", "/dashboard"));
+        String token = jwtUtils.generateToken((UserDetails) authentication.getPrincipal());
+        ResponseCookie cookie = ResponseCookie.from(JwtFilter.COOKIE_NAME, token)
+                .httpOnly(true).secure(false).sameSite("Lax").path("/")
+                .maxAge(8 * 60 * 60).build();
+        return ResponseEntity.ok().header("Set-Cookie", cookie.toString())
+                .body(java.util.Map.of("message", "Logged in successfully.",
+                        "redirect", "/dashboard", "token", token));
     }
 
     @PostMapping("/account/avatar")
@@ -78,8 +74,11 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpSession session) {
-        userService.logout(session);
-        return ResponseEntity.ok(java.util.Map.of("message", "Logged out successfully."));
+        session.invalidate();
+        ResponseCookie cookie = ResponseCookie.from(JwtFilter.COOKIE_NAME, "")
+                .httpOnly(true).secure(false).sameSite("Lax").path("/").maxAge(0).build();
+        return ResponseEntity.ok().header("Set-Cookie", cookie.toString())
+                .body(java.util.Map.of("message", "Logged out successfully."));
     }
 
     @DeleteMapping("/account")

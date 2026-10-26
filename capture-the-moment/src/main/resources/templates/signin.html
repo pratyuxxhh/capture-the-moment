@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="/js/auth.js"></script>
     <title>Sign in | Capture the Moment</title>
     <style>
       :root { font-family: Segoe UI, system-ui, sans-serif; color: #172033; }
@@ -47,8 +48,15 @@
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || "Request failed.");
+        if (action === "login") {
+          if (!payload.token) throw new Error("Login succeeded but no authentication token was returned.");
+          window.captureAuth.setToken(payload.token);
+          console.log("JWT token:", payload.token);
+          message.textContent = "Login successful. Redirecting...";
+          window.location.replace(payload.redirect || "/dashboard");
+          return;
+        }
         message.textContent = payload.message;
-        if (action === "login") window.location.href = "/";
       }
       form.addEventListener("submit", event => {
         event.preventDefault();

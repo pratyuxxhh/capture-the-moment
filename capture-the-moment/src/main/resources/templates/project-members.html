@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/project-shell :: head('Members')}"></head>
+<body>
+<div th:replace="~{fragments/project-shell :: shell('members', ~{::page})}">
+  <th:block th:fragment="page">
+    <h1>Members</h1>
+    <p class="muted">View the members who have access to this project.</p>
+    <div class="member-actions">
+      <button id="add-member-button" class="action" type="button" hidden>Add member</button>
+    </div>
+    <form id="add-member-form" hidden>
+      <label for="member-username">Member username</label>
+      <input id="member-username" required maxlength="100" autocomplete="off" />
+      <button class="action" type="submit">Add member</button>
+      <span id="member-message" class="muted" role="status"></span>
+    </form>
+    <div id="member-list" class="member-list">
+      <p class="muted">Loading members...</p>
+    </div>
+  </th:block>
+</div>
+<script th:inline="javascript">
+  const projectId = /*[[${projectId}]]*/ 0;
+  const memberList = document.getElementById("member-list");
+  const addMemberButton = document.getElementById("add-member-button");
+  const addMemberForm = document.getElementById("add-member-form");
+  const memberMessage = document.getElementById("member-message");
+
+  async function read(response) {
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || data.message || "Request failed.");
+    return data;
+  }
+
+  function renderMembers(members) {
+    memberList.replaceChildren();
+    if (!members.length) {
+      memberList.innerHTML = '<p class="muted">No members found.</p>';
+      return;
+    }
+    members.forEach(member => {
+      const item = document.createElement("div");
+      item.className = "member";
+      item.textContent = member.username;
+      memberList.append(item);
+    });
+  }
+
+  async function loadProjectAndMembers() {
+    const projects = await read(await fetch("/project"));
+    const project = projects.find(item => String(item.projectId) === String(projectId));
+    if (!project) throw new Error("You do not have access to this project.");
+    addMemberButton.hidden = !project.admin;
+    renderMembers(await read(await fetch(`/project/${projectId}/members`)));
+  }
+
+  addMemberButton.addEventListener("click", () => {
+    addMemberForm.hidden = !addMemberForm.hidden;
+    if (!addMemberForm.hidden) document.getElementById("member-username").focus();
+  });
+
+  addMemberForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    memberMessage.className = "muted";
+    memberMessage.textContent = "Adding member...";
+    try {
+      await read(await fetch(`/project/${projectId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: document.getElementById("member-username").value })
+      }));
+      event.target.reset();
+      addMemberForm.hidden = true;
+      memberMessage.textContent = "";
+      await loadProjectAndMembers();
+    } catch (error) {
+      memberMessage.className = "error";
+      memberMessage.textContent = error.message;
+    }
+  });
+
+  loadProjectAndMembers().catch(error => {
+    memberList.replaceChildren();
+    const errorMessage = document.createElement("p");
+    errorMessage.className = "error";
+    errorMessage.textContent = error.message;
+    memberList.append(errorMessage);
+  });
+</script>
+</body>
+</html>

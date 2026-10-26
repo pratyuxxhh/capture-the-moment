@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/project-shell :: head('Chit-chat')}"></head>
+<body>
+<div th:replace="~{fragments/project-shell :: shell('chat', ~{::page})}">
+  <th:block th:fragment="page">
+    <style>
+      .chat { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 20px; min-height: 520px; }
+      .chat-main { display: flex; min-height: 520px; flex-direction: column; border: 1px solid #dce1ea; border-radius: 12px; overflow: hidden; }
+      .chat-header { padding: 18px 20px; border-bottom: 1px solid #dce1ea; } .chat-header h2 { margin: 0 0 4px; }
+      .connection-status { display: inline-flex; align-items: center; gap: 7px; color: #5b6475; font-size: .9rem; }
+      .connection-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #c9ced8; }
+      .connection-status.connected::before { background: #2e9b62; } .connection-status.disconnected::before { background: #b42318; }
+      .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 20px; background: #f8f9fb; }
+      .chat-message { max-width: 78%; align-self: flex-start; padding: 10px 13px; background: white; border: 1px solid #e4e7ed; border-radius: 12px 12px 12px 3px; }
+      .chat-message.mine { align-self: flex-end; color: white; background: #3155d9; border-color: #3155d9; border-radius: 12px 12px 3px 12px; }
+      .chat-message-meta { margin-bottom: 4px; font-size: .78rem; opacity: .72; } .chat-message-content { white-space: pre-wrap; overflow-wrap: anywhere; }
+      .chat-system { align-self: center; color: #687386; font-size: .82rem; } .chat-composer { display: flex; gap: 10px; padding: 14px; border-top: 1px solid #dce1ea; }
+      .chat-composer textarea { flex: 1; min-height: 42px; max-height: 120px; resize: vertical; }
+      .online-panel { align-self: start; padding: 18px; border: 1px solid #dce1ea; border-radius: 12px; }
+      .online-panel h3 { margin: 0 0 14px; } .online-count { color: #5b6475; font-size: .9rem; }
+      .online-list { display: grid; gap: 10px; margin-top: 16px; } .online-user { display: flex; align-items: center; gap: 8px; }
+      .online-user::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #2e9b62; }
+      @media (max-width: 760px) { .chat { grid-template-columns: 1fr; } .online-panel { order: -1; } }
+    </style>
+    <h1 id="project-title">Chit-chat</h1>
+    <p class="muted">Real-time project discussion.</p>
+    <div class="chat">
+      <div class="chat-main">
+        <div class="chat-header"><h2 id="chat-project-name">Project discussion</h2><span id="chat-status" class="connection-status">Connecting...</span></div>
+        <div id="chat-messages" class="chat-messages" aria-live="polite"><p class="muted">Connecting to the project chat...</p></div>
+        <form id="chat-form" class="chat-composer"><textarea id="chat-input" maxlength="2000" placeholder="Write a message..." aria-label="Chat message"></textarea><button class="action" type="submit">Send</button></form>
+      </div>
+      <aside class="online-panel" aria-label="Online members"><h3>Online now</h3><div id="online-count" class="online-count">0 members</div><div id="online-list" class="online-list"></div></aside>
+    </div>
+  </th:block>
+</div>
+<script th:inline="javascript">
+  const projectId = /*[[${projectId}]]*/ 0, messages = document.getElementById("chat-messages"), input = document.getElementById("chat-input");
+  const status = document.getElementById("chat-status"), onlineCount = document.getElementById("online-count"), onlineList = document.getElementById("online-list");
+  let socket, retryTimer, retry = 0, currentUsername = "";
+  async function read(response) { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.message || "Request failed."); return data; }
+  function setStatus(text, state) { status.textContent = text; status.className = `connection-status ${state || ""}`; }
+  function addMessage(message) { const item = document.createElement("article"); item.className = `chat-message${message.username === currentUsername ? " mine" : ""}`;
+    const meta = document.createElement("div"); meta.className = "chat-message-meta"; meta.textContent = `${message.username} · ${new Date(message.sentAt).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}`;
+    const content = document.createElement("div"); content.className = "chat-message-content"; content.textContent = message.content; item.append(meta, content); messages.append(item); messages.scrollTop = messages.scrollHeight; }
+  function system(text) { const item = document.createElement("div"); item.className = "chat-system"; item.textContent = text; messages.append(item); messages.scrollTop = messages.scrollHeight; }
+  function presence(users) { onlineList.replaceChildren(); onlineCount.textContent = `${users.length} member${users.length === 1 ? "" : "s"}`; users.forEach(name => { const item = document.createElement("div"); item.className = "online-user"; item.textContent = name; onlineList.append(item); }); }
+  function disconnect() { clearTimeout(retryTimer); retry = 0; if (socket) { socket.onclose = null; socket.close(); socket = null; } presence([]); }
+  function connect() { disconnect(); setStatus("Connecting...", ""); const protocol = location.protocol === "https:" ? "wss" : "ws"; socket = new WebSocket(`${protocol}://${location.host}/ws/chat/${encodeURIComponent(projectId)}`);
+    socket.onopen = () => { retry = 0; setStatus("Connected", "connected"); messages.replaceChildren(); };
+    socket.onmessage = event => { const data = JSON.parse(event.data); if (data.type === "history") { messages.replaceChildren(); data.messages.forEach(addMessage); } else if (data.type === "message") addMessage(data.message); else if (data.type === "presence") presence(data.users); else if (data.type === "system" || data.type === "error") system(data.message); };
+    socket.onerror = () => setStatus("Connection problem", "disconnected");
+    socket.onclose = () => { socket = null; presence([]); setStatus("Disconnected · retrying...", "disconnected"); retryTimer = setTimeout(connect, Math.min(1000 * 2 ** ++retry, 10000)); }; }
+  document.getElementById("chat-form").addEventListener("submit", event => { event.preventDefault(); const content = input.value.trim(); if (content && socket?.readyState === WebSocket.OPEN) { socket.send(JSON.stringify({content})); input.value = ""; } });
+  input.addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); document.getElementById("chat-form").requestSubmit(); } });
+  fetch("/u/me").then(read).then(user => { currentUsername = user.username; connect(); }).catch(error => { setStatus(error.message, "disconnected"); });
+  window.addEventListener("beforeunload", disconnect);
+</script>
+</body>
+</html>

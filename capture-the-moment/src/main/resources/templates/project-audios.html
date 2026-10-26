@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/project-shell :: head('Audios')}"></head>
+<body>
+<div th:replace="~{fragments/project-shell :: shell('audios', ~{::page})}">
+  <th:block th:fragment="page">
+    <h1 id="project-title">Audios</h1>
+    <p class="muted">Upload and manage the audio files for this project.</p>
+    <form id="audio-form">
+      <label for="audio-file">Choose an audio file</label>
+      <input id="audio-file" type="file" accept=".mp3,.wav,.m4a,.flac,.ogg,audio/*" required />
+      <button class="action" type="submit">Upload and transcribe</button>
+      <span id="audio-message" class="muted" role="status"></span>
+    </form>
+    <div id="audio-list" class="audio-list"></div>
+  </th:block>
+</div>
+<script th:inline="javascript">
+  const projectId = /*[[${projectId}]]*/ 0;
+  const list = document.getElementById("audio-list");
+  const message = document.getElementById("audio-message");
+  async function read(response) { const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = data.detail || data.message
+        || (response.status === 409 ? "This audio already exists in the project." : "Request failed.");
+      throw new Error(message);
+    }
+    return data;
+  }
+  function render(items) {
+    list.replaceChildren();
+    if (!items.length) { list.innerHTML = '<p class="muted">No audio files uploaded yet.</p>'; return; }
+    items.forEach(audio => {
+      const item = document.createElement("article"); item.className = "audio-item";
+      const link = document.createElement("a"); link.href = `/api/project/${projectId}/audios/${audio.audioId}/content`;
+      link.target = "_blank"; link.rel = "noopener"; link.textContent = audio.fileName;
+      const status = document.createElement("span"); status.className = "muted"; status.textContent = ` · ${audio.status}`;
+      const player = document.createElement("audio"); player.controls = true; player.preload = "none"; player.src = link.href;
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "action danger-action"; deleteButton.type = "button";
+      deleteButton.textContent = "Delete";
+      deleteButton.addEventListener("click", async () => {
+        if (!window.confirm(`Delete "${audio.fileName}" and its transcription?`)) return;
+        deleteButton.disabled = true; message.className = "muted";
+        message.textContent = "Deleting audio and transcription...";
+        try {
+          await read(await fetch(`/api/project/${projectId}/audios/${audio.audioId}`, {
+            method: "DELETE"
+          }));
+          message.textContent = "Audio and transcription deleted.";
+          await load();
+        } catch (error) {
+          deleteButton.disabled = false;
+          message.className = "error";
+          message.textContent = error.message;
+        }
+      });
+      item.append(link, status, player, deleteButton); list.append(item);
+    });
+  }
+  async function load() { render(await read(await fetch(`/api/project/${projectId}/audios`))); }
+  document.getElementById("audio-form").addEventListener("submit", async event => {
+    event.preventDefault(); const file = document.getElementById("audio-file").files[0]; if (!file) return;
+    message.className = "muted";
+    message.textContent = "Uploading and transcribing...";
+    try {
+      const data = new FormData(); data.append("file", file);
+      await read(await fetch(`/api/project/${projectId}/audios`, {method: "POST", body: data}));
+      event.target.reset(); message.textContent = "Audio uploaded and transcription saved."; await load();
+    } catch (error) {
+      message.textContent = error.message;
+      message.className = "error";
+    }
+  });
+  load().catch(error => { list.textContent = error.message; list.className = "error"; });
+</script>
+</body>
+</html>

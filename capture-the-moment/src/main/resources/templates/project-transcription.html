@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/project-shell :: head('Transcription')}"></head>
+<body>
+<div th:replace="~{fragments/project-shell :: shell('transcription', ~{::page})}">
+  <th:block th:fragment="page">
+    <h1 id="project-title">Transcription</h1>
+    <p class="muted">Review and manage transcriptions for this project.</p>
+    <div id="transcription-list" class="transcript-list"></div>
+  </th:block>
+</div>
+<script th:inline="javascript">
+  const projectId = /*[[${projectId}]]*/ 0, list = document.getElementById("transcription-list");
+  async function read(response) { const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || data.message || "Request failed."); return data; }
+  async function load() {
+    const audios = await read(await fetch(`/api/project/${projectId}/transcriptions`)); list.replaceChildren();
+    if (!audios.length) { list.innerHTML = '<p class="muted">No audio files uploaded yet.</p>'; return; }
+    for (const audio of audios) {
+      const item = document.createElement("article"); item.className = "transcript-item";
+      const heading = document.createElement("h3"); heading.textContent = audio.fileName; item.append(heading);
+      const actions = document.createElement("div"); actions.className = "transcript-actions";
+      const seeButton = document.createElement("button"); seeButton.className = "action";
+      seeButton.type = "button"; seeButton.textContent = "See transcription";
+      seeButton.addEventListener("click", () => {
+        window.location.href = `/projects/${projectId}/transcription/${audio.audioId}`;
+      });
+      const summarizeButton = document.createElement("button"); summarizeButton.className = "action";
+      summarizeButton.type = "button"; summarizeButton.textContent = "Summarize";
+      summarizeButton.addEventListener("click", () => {});
+      actions.append(seeButton, summarizeButton);
+      item.append(actions);
+      list.append(item);
+    }
+  }
+  load().catch(error => { list.textContent = error.message; list.className = "error"; });
+</script>
+</body>
+</html>

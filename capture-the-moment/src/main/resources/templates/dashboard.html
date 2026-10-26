@@ -3,8 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="_csrf" th:content="${_csrf.token}" />
-    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+    <script src="/js/auth.js"></script>
     <title>Dashboard | Capture the Moment</title>
     <style>
       :root { font-family: Segoe UI, system-ui, sans-serif; color: #172033; }
@@ -45,10 +44,6 @@
     <script>
       const message = document.getElementById("message");
       const projects = document.getElementById("projects");
-      const csrf = () => ({
-        [document.querySelector('meta[name="_csrf_header"]').content]:
-          document.querySelector('meta[name="_csrf"]').content
-      });
       async function responseData(response) {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.detail || data.message || "Request failed.");
@@ -82,7 +77,7 @@
             article.append(link);
           }
           const openProject = () => {
-            window.location.href = `/project-name?projectId=${encodeURIComponent(project.projectId)}`;
+            window.location.href = `/projects/${encodeURIComponent(project.projectId)}/audios`;
           };
           article.addEventListener("click", openProject);
           article.addEventListener("keydown", event => {
@@ -105,7 +100,7 @@
           const projectName = document.getElementById("project-name").value;
           await responseData(await fetch("/project", {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...csrf() },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ projectName })
           }));
           event.target.reset();

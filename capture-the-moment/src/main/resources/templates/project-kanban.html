@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/project-shell :: head('Kanban')}"></head>
+<body>
+<div th:replace="~{fragments/project-shell :: shell('kanban', ~{::page})}">
+  <th:block th:fragment="page">
+    <h1>Kanban</h1>
+    <p class="muted">Organize project work with a kanban board.</p>
+    <section class="member">
+      <h2>Kanban board is not available yet</h2>
+      <p class="muted">This project has the Kanban database model, but task management endpoints have not been implemented.</p>
+    </section>
+  </th:block>
+</div>
+</body>
+</html>
