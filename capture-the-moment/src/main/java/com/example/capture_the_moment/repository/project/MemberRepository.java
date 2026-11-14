@@ -1,7 +1,7 @@
 package com.example.capture_the_moment.repository.project;
 
-import com.example.capture_the_moment.entity.Member;
-import com.example.capture_the_moment.entity.MemberId;
+import com.example.capture_the_moment.entity.project.Member;
+import com.example.capture_the_moment.entity.project.MemberId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.EntityGraph;
 

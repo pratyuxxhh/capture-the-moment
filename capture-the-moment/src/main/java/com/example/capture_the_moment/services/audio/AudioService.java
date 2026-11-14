@@ -1,9 +1,9 @@
 package com.example.capture_the_moment.services.audio;
 
-import com.example.capture_the_moment.entity.Audio;
-import com.example.capture_the_moment.entity.ProjectEntity;
-import com.example.capture_the_moment.entity.Transcript;
-import com.example.capture_the_moment.entity.TranscriptSegment;
+import com.example.capture_the_moment.entity.audio.Audio;
+import com.example.capture_the_moment.entity.project.ProjectEntity;
+import com.example.capture_the_moment.entity.audio.Transcript;
+import com.example.capture_the_moment.entity.audio.TranscriptSegment;
 import com.example.capture_the_moment.repository.audio.AudioRepository;
 import com.example.capture_the_moment.repository.audio.TranscriptRepository;
 import com.example.capture_the_moment.repository.audio.TranscriptSegmentRepository;

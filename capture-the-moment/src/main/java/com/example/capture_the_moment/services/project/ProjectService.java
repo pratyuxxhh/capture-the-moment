@@ -1,9 +1,11 @@
 package com.example.capture_the_moment.services.project;
 
-import com.example.capture_the_moment.entity.Member;
-import com.example.capture_the_moment.entity.MemberId;
-import com.example.capture_the_moment.entity.ProjectEntity;
-import com.example.capture_the_moment.entity.UserEntity;
+import com.example.capture_the_moment.services.chat.ChatService;
+import com.example.capture_the_moment.services.kanban.KanbanServices;
+import com.example.capture_the_moment.entity.project.Member;
+import com.example.capture_the_moment.entity.project.MemberId;
+import com.example.capture_the_moment.entity.project.ProjectEntity;
+import com.example.capture_the_moment.entity.user.UserEntity;
 import com.example.capture_the_moment.repository.project.MemberRepository;
 import com.example.capture_the_moment.repository.project.ProjectRepository;
 import com.example.capture_the_moment.repository.user.UserRepository;
@@ -25,17 +27,20 @@ public class ProjectService {
     private final UserRepository userRepository;
     private final InviteService inviteService;
     private final ChatService chatService;
+    private final KanbanServices kanbanServices;
 
     public ProjectService(ProjectRepository projectRepository,
                           MemberRepository memberRepository,
                           UserRepository userRepository,
                           InviteService inviteService,
-                          ChatService chatService) {
+                          ChatService chatService,
+                          KanbanServices kanbanServices) {
         this.projectRepository = projectRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.inviteService = inviteService;
         this.chatService = chatService;
+        this.kanbanServices = kanbanServices;
     }
 
     @Transactional
@@ -66,6 +71,7 @@ public class ProjectService {
         member.setRole(ADMIN_ROLE);
         member.setJoinedAt(now);
         memberRepository.save(member);
+        kanbanServices.ensureBoard(savedProject.getProjectId());
         return savedProject;
     }
 

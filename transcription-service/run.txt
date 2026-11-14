@@ -1,64 +1,7 @@
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+Done! Congratulations on your new bot. You will find it at t.me/StickyClay_bot. You can now add a description, about section and profile picture for your bot, see /help for a list of commands. By the way, when you've finished creating your cool bot, ping our Bot Support if you want a better username for it. Just make sure the bot is fully operational before you do this.
 
+Use this token to access the HTTP API:
+9236853901:AAGwL5lP7_SkrsAroIs28TwlRnDnnNcBPY0
+Keep your token secure and store it safely, it can be used by anyone to control your bot.
 
-
-
-# Capture-The-Moment — Local Development
-
-Run MySQL and MinIO in Docker while running the Spring Boot and transcription services locally.
-
-## Prerequisites
-
-Create a `.env` file in the root directory:
-
-```text
-HF_TOKEN=hf_your_token_here
-WHISPER_MODEL=base
-```
-
-## Run locally
-
-Start the database and object storage:
-
-```powershell
-docker compose up -d
-```
-
-Run the Spring Boot backend:
-
-```powershell
-cd capture-the-moment
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
-```
-
-Run the transcription service when needed:
-
-```powershell
-cd transcription-service
-.venv\Scripts\activate
-uvicorn app.main:app --reload --port 8000
-```
-
-Services:
-
-- Web app: `http://localhost:8080`
-- Transcription API: `http://localhost:8000`
-- Swagger: `http://localhost:8000/docs`
-- MinIO console: `http://localhost:9001`
-
-Stop the local infrastructure:
-
-```powershell
-docker compose down
-```
-
-
-
-wget    -P amicorpus/ES2002a/audio https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2002a/audio/ES2002a.Mix-Headset.wav
-wget    -P amicorpus/ES2002b/audio https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2002b/audio/ES2002b.Mix-Headset.wav
-wget    -P amicorpus/ES2002c/audio https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2002c/audio/ES2002c.Mix-Headset.wav
-wget    -P amicorpus/ES2002d/audio https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2002d/audio/ES2002d.Mix-Headset.wav
-wget  https://groups.inf.ed.ac.uk/ami/download/temp/../CCBY4.0.txt
+For a description of the Bot API, see this page: https://core.telegram.org/bots/api

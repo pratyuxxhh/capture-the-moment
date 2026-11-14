@@ -1,6 +1,6 @@
 package com.example.capture_the_moment.repository.audio;
 
-import com.example.capture_the_moment.entity.Transcript;
+import com.example.capture_the_moment.entity.audio.Transcript;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

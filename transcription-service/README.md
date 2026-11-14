@@ -1,58 +1,75 @@
-# Transcription Service
+# transcription-service (FastAPI)
 
-Local CPU transcription and speaker diarization. **MVC, no database.**
+The speech-to-text microservice of [Capture the Moment](../README.md). It takes one audio file and returns **who said what, and when**:
 
-| Layer | Folder | Role |
-| --- | --- | --- |
-| Model | `app/models` | JSON schemas and in-memory dataclasses |
-| View | `app/views` | Upload HTML |
-| Controller | `app/controllers` | HTTP routes |
-| Service | `app/services` | Whisper, pyannote, alignment, temp files |
+1. **faster-whisper** turns speech into text segments with timestamps and detects the language.
+2. **pyannote.audio** (`pyannote/speaker-diarization-community-1`) finds the speaker turns: `SPEAKER_00`, `SPEAKER_01`, …
+3. **Alignment** gives each Whisper segment the speaker whose turn overlaps it the most (`UNKNOWN` if none does).
 
-Nothing is persisted in PostgreSQL, Redis, or any other store. Uploads are deleted after each request.
+The service is **stateless**. It has no database. Each upload is written to `uploads/` and deleted when the request finishes. The Spring Boot app calls it and stores the results. It has **no authentication**, so keep port 8000 local.
 
-Whisper produces text + timestamps. Pyannote produces anonymous speaker intervals (`SPEAKER_00`). Overlap alignment merges them. CUDA is not required.
+---
 
-## Why it fails after only adding a token
+## Run locally
 
-`HF_TOKEN` authenticates you. It does **not** grant the gated model by itself.
+**Requires:** Python 3.11 (recommended; it matches the Docker image), internet on the first run to download models, and Hugging Face access (next section).
 
-You must also, while logged into **the same Hugging Face account** as the token:
-
-1. Open [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)
-2. Click **Agree and access repository**
-3. Wait about a minute, then restart the app
-
-Until that is done, Hugging Face returns **403** and diarization cannot start.
-
-## Hugging Face token
-
-```text
-HF_TOKEN=hf_your_token_here
+```powershell
+cd transcription-service
+python -m venv .venv
+.venv\Scripts\activate                 # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+copy .env.example .env                 # macOS/Linux: cp .env.example .env
+# edit .env and set HF_TOKEN
+uvicorn app.main:app --reload --port 8000 --reload-exclude uploads --reload-exclude .venv
 ```
 
-No quotes, no spaces around `=`. Keep `.env` out of git. Use a **read** token.
+| URL | What |
+| --- | --- |
+| http://localhost:8000/ | simple upload page for testing without Spring |
+| http://localhost:8000/docs | Swagger UI |
+| http://localhost:8000/health | `{"status": "UP"}` |
 
-## Local setup
+The server starts immediately. Whisper and pyannote load on the **first** `POST /transcribe`, so that first request is slow because it downloads the weights into the Hugging Face cache.
+
+Quick test:
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --reload-exclude uploads --reload-exclude .venv
+curl -X POST "http://localhost:8000/transcribe" -F "file=@audio/test.mp3"
 ```
 
-The HTTP server starts immediately. Whisper and pyannote download on the **first** `POST /transcribe`.
+---
 
-- Docs: http://localhost:8000/docs
-- Form: http://localhost:8000/
-- Health: http://localhost:8000/health
+## Hugging Face access (required for speaker labels)
 
-Optional: `WHISPER_MODEL=turbo` in `.env` (slower, more RAM). Default is `base`.
+The pyannote model is **gated**. A token alone is not enough.
+
+1. Create a **read** token at https://huggingface.co/settings/tokens.
+2. Logged in with the **same account**, open [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) and click **Agree and access repository**.
+3. Wait about a minute, then restart the service.
+
+Until both steps are done, `/transcribe` returns **403** with an explanation.
+
+---
+
+## Configuration (`.env`)
+
+The service reads **`transcription-service/.env`**, not the repo root.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `HF_TOKEN` | none (required) | Hugging Face token. Write it without quotes or spaces. `HUGGING_FACE_HUB_TOKEN` also works |
+| `WHISPER_MODEL` | `base` | `tiny`, `base`, `small`, `medium`, `large-v3`, `turbo`. Bigger models are more accurate, slower and use more RAM |
+
+Hardware is picked automatically. If `torch.cuda.is_available()` is true, the service uses the GPU with `float16`; otherwise it uses the CPU with `int8`. The startup log shows which one it chose.
+
+---
 
 ## API
 
-`POST /transcribe` — `multipart/form-data` field `file`. JSON only.
+### `POST /transcribe`
+
+Send `multipart/form-data` with the field `file`. Allowed types: `.mp3`, `.wav`, `.m4a`, `.flac`, `.ogg`.
 
 ```json
 {
@@ -60,31 +77,49 @@ Optional: `WHISPER_MODEL=turbo` in `.env` (slower, more RAM). Default is `base`.
   "language": "en",
   "language_probability": 0.98,
   "segments": [
-    {
-      "speaker": "SPEAKER_00",
-      "start": 0.0,
-      "end": 4.2,
-      "text": "Let's discuss the database."
-    }
+    { "speaker": "SPEAKER_00", "start": 0.0, "end": 4.2, "text": "Let's discuss the database." }
   ]
 }
 ```
 
-`SPEAKER_00` is not a person's name.
+| Status | When |
+| --- | --- |
+| 400 | no file, or an unsupported extension |
+| 403 | `HF_TOKEN` missing or invalid, or gated model access not accepted |
+| 500 | model or processing failure |
 
-## Testing
+Speaker labels are anonymous clusters, not real names. Requests are processed **one at a time** because a global lock keeps memory use bounded.
 
-```bash
-curl -X POST "http://localhost:8000/transcribe" -F "file=@audio/test.mp3"
-```
+### Other routes
 
-## Layout
+- `GET /health` returns the health check.
+- `GET /` serves the upload page.
+- `GET /query?query=x` returns a test echo.
+
+---
+
+## Code layout (MVC, no database)
 
 ```text
-app/main.py
-app/controllers/     HTTP
-app/models/          schemas (no DB)
-app/views/           HTML
-app/services/        transcription, diarization, alignment
-uploads/             temp audio only
+app/
+  main.py                    FastAPI app; creates MeetingService at startup
+  controllers/               HTTP routes: transcription, health, page
+  services/
+    meeting_service.py       orchestrates one request: save → transcribe → diarize → align → delete
+    transcription_service.py faster-whisper (lazy-loaded)
+    diarization_service.py   pyannote pipeline (lazy-loaded), audio decoded to 16 kHz
+    alignment_service.py     speaker ↔ segment by maximum time overlap
+    storage_service.py       temp files in uploads/
+    hf_auth.py               validates HF_TOKEN and gated access before downloading
+    config.py                paths, allowed types, device selection, .env loading
+  models/                    Pydantic response schemas + dataclasses
+  views/index.html           test upload page
+uploads/                     temporary files only (git-ignored)
+audio/                       put local test audio here (git-ignored)
 ```
+
+---
+
+## Docker image
+
+`Dockerfile` builds on `python:3.11-slim`, installs ffmpeg, runs as a non-root user and exposes port 8000. Pass `HF_TOKEN` as an environment variable when you run it. It is not used during development. To publish, use [`../scripts/build-and-publish.ps1`](../scripts/build-and-publish.ps1).

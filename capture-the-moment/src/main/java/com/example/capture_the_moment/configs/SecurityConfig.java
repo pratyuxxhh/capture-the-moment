@@ -1,6 +1,6 @@
 package com.example.capture_the_moment.configs;
 
-import com.example.capture_the_moment.filters.JwtFilter;
+import com.example.capture_the_moment.security.JwtFilter;
 import com.example.capture_the_moment.services.user.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;

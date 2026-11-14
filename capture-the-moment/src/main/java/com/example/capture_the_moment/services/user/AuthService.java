@@ -1,8 +1,8 @@
 package com.example.capture_the_moment.services.user;
 
-import com.example.capture_the_moment.entity.SignInDTO;
-import com.example.capture_the_moment.entity.ChangePasswordDTO;
-import com.example.capture_the_moment.entity.UserEntity;
+import com.example.capture_the_moment.dto.SignInDTO;
+import com.example.capture_the_moment.dto.ChangePasswordDTO;
+import com.example.capture_the_moment.entity.user.UserEntity;
 import com.example.capture_the_moment.repository.user.UserRepository;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.security.core.context.SecurityContextHolder;

@@ -4,12 +4,103 @@
 <body>
 <div th:replace="~{fragments/project-shell :: shell('kanban', ~{::page})}">
   <th:block th:fragment="page">
-    <h1>Kanban</h1>
-    <p class="muted">Organize project work with a kanban board.</p>
-    <section class="member">
-      <h2>Kanban board is not available yet</h2>
-      <p class="muted">This project has the Kanban database model, but task management endpoints have not been implemented.</p>
+    <style>
+      .kanban-header { display:flex; justify-content:space-between; gap:20px; align-items:flex-start; margin-bottom:24px; }
+      .presence { display:flex; align-items:center; gap:8px; color:#5b6475; font-size:14px; }
+      .avatars { display:flex; padding-left:8px; }
+      .avatar { width:32px; height:32px; border-radius:50%; display:grid; place-items:center; margin-left:-8px;
+        border:3px solid white; color:white; background:#3155d9; font-size:11px; font-weight:700; overflow:hidden; }
+      .avatar img { width:100%; height:100%; object-fit:cover; }
+      .board { display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
+      .column { background:#f4f6f8; border-radius:12px; padding:14px; min-height:380px; }
+      .column h2 { font-size:14px; margin:0 0 14px; color:#4a5568; text-transform:uppercase; letter-spacing:.06em; }
+      .count { float:right; color:#8992a3; }
+      .tasks { display:grid; gap:10px; min-height:330px; }
+      .task { background:white; border:1px solid #e1e5eb; border-radius:10px; padding:14px; box-shadow:0 2px 6px #1720330b; cursor:grab; }
+      .task:active { cursor:grabbing; } .task h3 { margin:0 0 7px; font-size:15px; }
+      .task p { margin:0 0 14px; color:#687386; font-size:13px; white-space:pre-wrap; }
+      .task-footer { display:flex; justify-content:space-between; align-items:center; color:#8992a3; font-size:12px; }
+      .task-user { display:flex; align-items:center; gap:6px; } .task-user .avatar { width:24px; height:24px; border-width:0; margin:0; }
+      .add-task { display:grid; grid-template-columns:1fr 1fr auto; gap:10px; margin:0 0 20px; padding:14px; background:#f4f6f8; border:0; }
+      .add-task input { min-width:0; } .empty { color:#8992a3; font-size:13px; text-align:center; padding:28px 8px; }
+      @media (max-width:800px) { .board { grid-template-columns:1fr; } .kanban-header { display:block; } .presence { margin-top:14px; } .add-task { grid-template-columns:1fr; } }
+    </style>
+    <div class="kanban-header">
+      <div><h1>Project board</h1><p class="muted">Move work forward together, in real time.</p></div>
+      <div class="presence"><span id="online-count">0 online</span><div class="avatars" id="avatars"></div></div>
+    </div>
+    <form class="add-task" id="task-form">
+      <input id="task-title" required maxlength="200" placeholder="Task title" aria-label="Task title">
+      <input id="task-description" maxlength="1000" placeholder="Description (optional)" aria-label="Task description">
+      <button class="action" type="submit">Add task</button>
+    </form>
+    <p class="error" id="board-error" role="alert"></p>
+    <section class="board" aria-label="Kanban board">
+      <div class="column" data-status="TODO"><h2>To do <span class="count">0</span></h2><div class="tasks"></div></div>
+      <div class="column" data-status="IN_PROGRESS"><h2>In progress <span class="count">0</span></h2><div class="tasks"></div></div>
+      <div class="column" data-status="DONE"><h2>Done <span class="count">0</span></h2><div class="tasks"></div></div>
     </section>
+    <script th:inline="javascript">
+      const projectId = /*[[${projectId}]]*/ 0;
+      const tasks = new Map(), presence = new Map();
+      const error = document.getElementById('board-error');
+      const initials = name => name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase();
+      const avatar = (name, image, extra = '') => `<span class="avatar ${extra}">${image ? `<img src="${image}" alt="">` : initials(name)}</span>`;
+      function render() {
+        document.querySelectorAll('.tasks').forEach(element => element.innerHTML = '');
+        const counts = { TODO: 0, IN_PROGRESS: 0, DONE: 0 };
+        tasks.forEach(task => {
+          counts[task.status]++;
+          const element = document.createElement('article');
+          element.className = 'task'; element.draggable = true; element.dataset.taskId = task.taskId;
+          const assignee = task.assigneeUsername ? `<span class="task-user">${avatar(task.assigneeUsername, task.assigneeAvatar)}${task.assigneeUsername}</span>` : '';
+          element.innerHTML = `<h3>${escapeHtml(task.title)}</h3>${task.description ? `<p>${escapeHtml(task.description)}</p>` : ''}<div class="task-footer">${assignee}<button class="delete-task" title="Delete task" aria-label="Delete ${escapeHtml(task.title)}">&times;</button></div>`;
+          element.addEventListener('dragstart', event => event.dataTransfer.setData('text/plain', task.taskId));
+          element.querySelector('.delete-task').addEventListener('click', () => send({type:'delete', taskId:task.taskId}));
+          document.querySelector(`[data-status="${task.status}"] .tasks`).append(element);
+        });
+        document.querySelectorAll('.column').forEach(column => {
+          column.querySelector('.count').textContent = counts[column.dataset.status];
+          if (!column.querySelector('.task')) column.querySelector('.tasks').innerHTML = '<div class="empty">No tasks here yet</div>';
+        });
+      }
+      function renderPresence(users) {
+        const container = document.getElementById('avatars'); container.innerHTML = '';
+        users.forEach(user => { presence.set(user.username, user); container.insertAdjacentHTML('beforeend', avatar(user.username, user.avatar)); });
+        document.getElementById('online-count').textContent = `${users.length} online`;
+      }
+      function escapeHtml(value) { const div = document.createElement('div'); div.textContent = value || ''; return div.innerHTML; }
+      function send(payload) { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); }
+      document.querySelectorAll('.tasks').forEach(container => container.addEventListener('dragover', event => event.preventDefault()));
+      document.querySelectorAll('.column').forEach(column => column.querySelector('.tasks').addEventListener('drop', event => {
+        event.preventDefault(); send({type:'status', taskId:Number(event.dataTransfer.getData('text/plain')), status:column.dataset.status});
+      }));
+      document.getElementById('task-form').addEventListener('submit', event => {
+        event.preventDefault(); const title = document.getElementById('task-title');
+        send({type:'create', title:title.value, description:document.getElementById('task-description').value}); event.target.reset();
+      });
+      let socket, reconnectDelay = 1000;
+      function connect() {
+        socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/kanban/${projectId}`);
+        socket.onopen = () => { reconnectDelay = 1000; error.textContent = ''; };
+        socket.onmessage = event => {
+          const message = JSON.parse(event.data); error.textContent = '';
+          if (message.type === 'state') message.tasks.forEach(task => tasks.set(task.taskId, task));
+          if (message.type === 'task-created' || message.type === 'task-updated') tasks.set(message.task.taskId, message.task);
+          if (message.type === 'task-deleted') tasks.delete(message.taskId);
+          if (message.type === 'presence') renderPresence(message.users);
+          if (message.type === 'error') error.textContent = message.message;
+          render();
+        };
+        socket.onclose = () => {
+          error.textContent = 'Live updates disconnected. Reconnecting...';
+          window.setTimeout(connect, reconnectDelay);
+          reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+        };
+      }
+      connect();
+      render();
+    </script>
   </th:block>
 </div>
 </body>

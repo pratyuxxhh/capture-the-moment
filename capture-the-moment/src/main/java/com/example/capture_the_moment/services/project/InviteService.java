@@ -1,8 +1,8 @@
 package com.example.capture_the_moment.services.project;
 
-import com.example.capture_the_moment.entity.Member;
-import com.example.capture_the_moment.entity.MemberId;
-import com.example.capture_the_moment.entity.UserEntity;
+import com.example.capture_the_moment.entity.project.Member;
+import com.example.capture_the_moment.entity.project.MemberId;
+import com.example.capture_the_moment.entity.user.UserEntity;
 import com.example.capture_the_moment.repository.project.MemberRepository;
 import com.example.capture_the_moment.repository.project.ProjectRepository;
 import com.example.capture_the_moment.repository.user.UserRepository;

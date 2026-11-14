@@ -1,6 +1,6 @@
 package com.example.capture_the_moment.repository.user;
 
-import com.example.capture_the_moment.entity.UserEntity;
+import com.example.capture_the_moment.entity.user.UserEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

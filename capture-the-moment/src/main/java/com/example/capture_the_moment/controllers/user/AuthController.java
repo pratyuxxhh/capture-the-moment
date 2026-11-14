@@ -1,10 +1,10 @@
 package com.example.capture_the_moment.controllers.user;
 
-import com.example.capture_the_moment.entity.SignInDTO;
-import com.example.capture_the_moment.entity.ChangePasswordDTO;
+import com.example.capture_the_moment.dto.SignInDTO;
+import com.example.capture_the_moment.dto.ChangePasswordDTO;
 import com.example.capture_the_moment.services.user.AuthService;
-import com.example.capture_the_moment.filters.JwtFilter;
-import com.example.capture_the_moment.utils.JwtUtils;
+import com.example.capture_the_moment.security.JwtFilter;
+import com.example.capture_the_moment.security.JwtUtils;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;

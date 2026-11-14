@@ -1,7 +1,7 @@
 package com.example.capture_the_moment.controllers.project;
 
-import com.example.capture_the_moment.entity.Member;
-import com.example.capture_the_moment.entity.ProjectEntity;
+import com.example.capture_the_moment.entity.project.Member;
+import com.example.capture_the_moment.entity.project.ProjectEntity;
 import com.example.capture_the_moment.services.project.ProjectService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
